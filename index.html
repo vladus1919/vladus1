@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Собери монеты</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #18202b;
+      color: white;
+    }
+
+    canvas {
+      display: block;
+      margin: 16px auto;
+      background: #26384a;
+      border: 3px solid white;
+      max-width: 100%;
+      touch-action: none;
+    }
+
+    button {
+      padding: 12px 18px;
+      margin: 4px;
+      font-size: 18px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 60px 60px 60px;
+      justify-content: center;
+    }
+
+    .controls button:nth-child(1) { grid-column: 2; }
+    .controls button:nth-child(2) { grid-column: 1; }
+    .controls button:nth-child(3) { grid-column: 2; }
+    .controls button:nth-child(4) { grid-column: 3; }
+  </style>
+</head>
+<body>
+  <h1>Собери монеты</h1>
+<p>Создатель: Владислав андрей фу</p>
+  <p>Счёт: <span id="score">0</span> · Стрелки или WASD</p>
+  <canvas id="game" width="400" height="400"></canvas>
+  <button onclick="restart()">Начать заново</button>
+
+  <div class="controls">
+    <button data-dir="up">⬆️</button>
+    <button data-dir="left">⬅️</button>
+    <button data-dir="down">⬇️</button>
+    <button data-dir="right">➡️</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreText = document.getElementById("score");
+
+    const player = { x: 40, y: 40, size: 24, speed: 4 };
+    const coin = { x: 300, y: 200, size: 16 };
+    const obstacles = [
+      { x: 120, y: 80, w: 30, h: 150 },
+      { x: 230, y: 180, w: 120, h: 30 },
+      { x: 80, y: 300, w: 150, h: 25 }
+    ];
+
+    const keys = {};
+    let score = 0;
+    let gameOver = false;
+
+    function placeCoin() {
+      coin.x = 20 + Math.random() * (canvas.width - coin.size - 40);
+      coin.y = 20 + Math.random() * (canvas.height - coin.size - 40);
+    }
+
+    function restart() {
+      player.x = 40;
+      player.y = 40;
+      score = 0;
+      gameOver = false;
+      scoreText.textContent = score;
+      placeCoin();
+      draw();
+    }
+
+    function overlaps(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.size > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.size > b.y;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Препятствия
+      ctx.fillStyle = "#e74c3c";
+      obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+
+      // Монета
+      ctx.fillStyle = "#ffd43b";
+      ctx.beginPath();
+      ctx.arc(coin.x + coin.size / 2, coin.y + coin.size / 2,
+              coin.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Игрок
+      ctx.fillStyle = gameOver ? "#999" : "#55e08a";
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+
+      if (gameOver) {
+        ctx.fillStyle = "white";
+        ctx.font = "28px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Игра окончена!", canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    function update() {
+      if (!gameOver) {
+        let nextX = player.x;
+        let nextY = player.y;
+
+        if (keys.ArrowLeft || keys.a) nextX -= player.speed;
+        if (keys.ArrowRight || keys.d) nextX += player.speed;
+        if (keys.ArrowUp || keys.w) nextY -= player.speed;
+        if (keys.ArrowDown || keys.s) nextY += player.speed;
+
+        nextX = Math.max(0, Math.min(canvas.width - player.size, nextX));
+        nextY = Math.max(0, Math.min(canvas.height - player.size, nextY));
+
+        const nextPlayer = { x: nextX, y: nextY, size: player.size };
+        if (obstacles.some(o => overlaps(nextPlayer, { ...o, size: 0 }))) {
+          gameOver = true;
+        } else {
+          player.x = nextX;
+          player.y = nextY;
+        }
+
+        const coinBox = { x: coin.x, y: coin.y, w: coin.size, h: coin.size };
+        if (overlaps(player, coinBox)) {
+          score++;
+          scoreText.textContent = score;
+          placeCoin();
+        }
+      }
+
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    document.addEventListener("keydown", e => {
+      keys[e.key] = true;
+      keys[e.key.toLowerCase()] = true;
+    });
+
+    document.addEventListener("keyup", e => {
+      keys[e.key] = false;
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    document.querySelectorAll("[data-dir]").forEach(button => {
+      const dir = button.dataset.dir;
+      const key = { up: "ArrowUp", down: "ArrowDown",
+                    left: "ArrowLeft", right: "ArrowRight" }[dir];
+
+      button.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        keys[key] = true;
+      });
+
+      for (const eventName of ["pointerup", "pointerleave", "pointercancel"]) {
+        button.addEventListener(eventName, () => keys[key] = false);
+      }
+    });
+
+    placeCoin();
+    update();
+  </script>
+</body>
+</html>
